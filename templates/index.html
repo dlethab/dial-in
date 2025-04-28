@@ -122,10 +122,16 @@
         <div id="keyboard-container">
             <img src="{{ url_for('static', filename='lightmode-keypad.png') }}" alt="Phone Keypad" class="keyboard-image">
         </div>
-        
+
+
         <button id="submit-btn" class="circle-button disabled" disabled>
             <img src="static/phoneicon.png" alt="Call" class="circle-icon">
         </button>
+
+        <!-- Hidden input field to prevent mobile keyboard from opening -->
+        <input type="text" id="hidden-mobile-input" style="position: absolute; top: -1000px;">
+
+
         <!-- Share button to reopen popup -->
         <button id="share-btn" class="hidden-share share-btn" onclick="showShareablePopup()">Share</button>
         
@@ -152,6 +158,48 @@
                     <span id="countdown-minutes" class="countdown-timer"></span>!
                 </p>
             </div>
+        </div>
+    </div>
+    <!-- Custom QWERTY Keyboard -->
+    <div id="custom-keyboard" class="keyboard-container">
+        <!-- First Row of Keys -->
+        <div class="keyboard-row">
+            <button class="key">Q</button>
+            <button class="key">W</button>
+            <button class="key">E</button>
+            <button class="key">R</button>
+            <button class="key">T</button>
+            <button class="key">Y</button>
+            <button class="key">U</button>
+            <button class="key">I</button>
+            <button class="key">O</button>
+            <button class="key">P</button>
+        </div>
+
+        <!-- Second Row of Keys -->
+        <div class="keyboard-row">
+            <button class="key">A</button>
+            <button class="key">S</button>
+            <button class="key">D</button>
+            <button class="key">F</button>
+            <button class="key">G</button>
+            <button class="key">H</button>
+            <button class="key">J</button>
+            <button class="key">K</button>
+            <button class="key">L</button>
+        </div>
+
+        <!-- Third Row of Keys -->
+        <div class="keyboard-row">
+            <button class="key space-bar">SPACE</button>
+            <button class="key">Z</button>
+            <button class="key">X</button>
+            <button class="key">C</button>
+            <button class="key">V</button>
+            <button class="key">B</button>
+            <button class="key">N</button>
+            <button class="key">M</button>
+            <button class="key backspace">&#9003;</button>
         </div>
     </div>
 </body>

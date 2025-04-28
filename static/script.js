@@ -17,6 +17,32 @@ let finalWinStatus = null;
 let finalTotalSeconds = null;
 let finalAnswerWord = "";
 
+let isMobileDevice = false;
+
+
+document.addEventListener("DOMContentLoaded", function () {
+    // Detect if the user is on mobile device
+    isMobileDevice = isMobile();  // This flag will be true for mobile users
+    console.log(isMobileDevice ? "Mobile user detected." : "Desktop user detected.");
+    
+    // Initially hide the keyboard
+    toggleKeyboard(false);
+});
+
+function isMobile() {
+    return /Mobi/i.test(window.navigator.userAgent);
+}
+
+
+// Toggle the keyboard visibility based on the state of the game
+function toggleKeyboard(visible) {
+    const keyboard = document.getElementById('custom-keyboard');
+    if (isMobileDevice && visible) {
+        keyboard.style.display = 'flex';  // Show the keyboard for mobile users only
+    } else {
+        keyboard.style.display = 'none'; // Hide the keyboard
+    }
+}
 
 
 //pull date and game # from html
@@ -248,6 +274,8 @@ function handleTyping(event) {
 }
 
 
+
+
 function highlightCurrentCell(index) {
     const cells = document.querySelectorAll(".input-cell");
     cells.forEach(cell => cell.classList.remove("active-cell")); // Remove previous highlight
@@ -322,7 +350,7 @@ function showShareablePopup(isWin, finalTotalSeconds) {
         message = "You're a star. Mom and Dad would be proud"; // ✅ First try
     } else if (remainingAttempts === 1) {
         message = "Super!"; // ✅ Two tries
-    } else if (remainingAttempts === 0 ) {
+    } else if (remainingAttempts === 0 & isWin) {
         message = "Get it together man"; // ✅ Three tries
     } else {
         message = "Better Luck Next Time!"; // ✅ User failed
@@ -418,20 +446,6 @@ function formatTime(seconds) {
 }
 
 
-document.addEventListener("DOMContentLoaded", function () {
-    let mobileInput = document.getElementById("hidden-mobile-input");
-
-    // ✅ Use a delay to ensure the page loads fully before focusing
-    setTimeout(() => {
-        focusInput();
-    }, 500); // Slight delay to avoid browser restrictions
-
-    // ✅ Refocus when a user taps the input grid
-    document.getElementById("guess-input-grid").addEventListener("click", function () {
-        focusInput();
-    });
-});
-
 
 // ✅ Move to the next cell after typing a letter
 function moveToNextCell() {
@@ -471,8 +485,13 @@ document.getElementById("share-btn").addEventListener("click", function () {
 
 
 document.getElementById("play-btn").addEventListener("click", function () {
+    
     document.getElementById("game-intro").style.display = "none"; // Hide the overlay
     document.getElementById("how-to-play-popup").classList.remove("popup-hidden");
+    if (isMobileDevice) {
+        toggleKeyboard(true); // Show the custom keyboard for mobile users
+        focusInput();  // Ensure the hidden input is focused
+    }
 });
 
 
@@ -494,7 +513,6 @@ document.getElementById("help-icon").addEventListener("click", function () {
 // ✅ Close How to Play popup
 document.getElementById("close-how-to-play").addEventListener("click", function () {
     document.getElementById("how-to-play-popup").classList.add("popup-hidden");
-    focusInput();
     startGameTimer(); // ✅ Start only once
 });
 
@@ -502,27 +520,8 @@ document.getElementById("close-how-to-play").addEventListener("click", function 
 // ✅ Close popup when PLAY button is clicked
 document.getElementById("play-button").addEventListener("click", function () {
     document.getElementById("how-to-play-popup").classList.add("popup-hidden");
-    focusInput();
+
     startGameTimer();
-});
-
-
-function focusInput() {
-    let mobileInput = document.getElementById("hidden-mobile-input");
-    let guessGrid = document.getElementById("guess-input-grid");
-    let focusSpot = document.getElementById("toolbar");
-
-    mobileInput.focus();
-    
-    // ✅ Scroll to keep the guess input grid in view
-    setTimeout(() => {
-        focusSpot.scrollIntoView({ behavior: "smooth", block: "center" });
-    }, 200);
-}
-
-// ✅ Refocus when the user taps the guess input grid
-document.getElementById("guess-input-grid").addEventListener("click", function () {
-    focusInput();
 });
 
 // ✅ Call `focusInput()` whenever a new grid is added after a guess
@@ -531,5 +530,4 @@ function createNewGuessInputGrid() {
     newGrid.classList.add("guess-row");
     document.getElementById("guess-container").appendChild(newGrid);
     
-    focusInput(); // ✅ Ensures keyboard opens immediately
 }

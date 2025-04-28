@@ -479,6 +479,95 @@ body {
     pointer-events: none;
 }
 
+/* Custom keyboard container */
+#custom-keyboard {
+    display: flex;
+    flex-direction: column;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    width: 100%;  /* Full width of the screen */
+    padding-top: 10px;
+    z-index: 10; /* Lower than popups */
+    visibility: visible;
+}
+
+/* Keyboard row: Prevent wrapping and fit keys to screen */
+.keyboard-row {
+    display: flex;
+    justify-content: space-evenly; /* Evenly distribute keys */
+    margin-bottom: 5px;
+    width: 100%;
+}
+
+/* Individual key button */
+.key {
+    padding: 5px;
+    margin: 5px;
+    background-color: #007bff;
+    color: white;
+    border: none;
+    font-size: 18px;
+    cursor: pointer;
+    border-radius: 5px;
+    text-align: center;
+    flex-grow: 1; /* Allow key to grow and take available space */
+    flex-basis: 0%; /* Prevent keys from taking excessive space */
+    box-sizing: border-box; /* Ensure padding and border are included in the width/height */
+    min-width: 0; /* Ensure keys do not get smaller than required */
+    height: 50px; /* Keep consistent height for all keys */
+}
+
+/* Hover effect for keys */
+.key:hover {
+    background-color: #0056b3;
+}
+
+/* Spacebar key */
+.space-bar {
+    width: 70px; /* Larger width for spacebar */
+    flex-grow: 0; /* Spacebar should not grow, as it has a fixed width */
+    flex-basis: auto;
+}
+
+/* Backspace key */
+.backspace {
+    width: 50px; /* Larger width for backspace */
+    flex-grow: 0; /* Backspace should not grow */
+    flex-basis: auto;
+}
+
+/* Popups should appear above the keyboard */
+.popup-content {
+    z-index: 20; /* Higher than the keyboard */
+    position: relative;
+}
+
+/* Ensure the keys take up all available width but do not wrap */
+@media (max-width: 768px) {
+    .key {
+        font-size: 16px; /* Reduce font size on smaller screens */
+        height: 45px;  /* Adjust height for smaller screens */
+    }
+
+    .space-bar {
+        width: 70px; /* Make spacebar slightly smaller on smaller screens */
+    }
+
+    .backspace {
+        width: 50px; /* Adjust backspace size for smaller screens */
+    }
+}
+
+
+
+
+
+
+
+
+
+
 
 
 #shareable-popup {
