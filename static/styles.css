@@ -548,6 +548,14 @@ body {
 
 
 /* Improve button styling */
+#results-button-container {
+    display: flex;
+    justify-content: center;  /* horizontal centering */
+    align-items: center;      /* vertical centering */
+    height: 100%;             /* or set a specific height */
+    gap: 20px;
+}
+
 #SHARE-RESULTS-BUTTON {
     font-size: 18px;
     padding: 12px 24px;
@@ -563,6 +571,36 @@ body {
     background-color: #0056b3;
 }
 
+#COPY-RESULTS-BUTTON {
+    font-size: 18px;
+    padding: 12px 24px;
+    border: none;
+    background-color: #159522;
+    color: white;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background 0.3s;
+}
+
+#COPY-RESULTS-BUTTON:hover {
+    background-color: #237412;
+}
+
+#copy-message {
+    margin-top: 10px;
+    text-align: center;
+    color: black;
+    font-size: 16px;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    height: 20px; /* reserve space so layout doesn't shift */
+}
+
+#copy-message.show {
+    opacity: 1;
+}
+
+
 .popup-logo {
     width: 120px;         /* Adjust as needed */
     margin-bottom: 20px;
@@ -572,6 +610,7 @@ body {
 }
 
 .countdown-message {
+    margin-top: 0px;
     font-size: 24px;
     font-weight: bold;
     color: #333;

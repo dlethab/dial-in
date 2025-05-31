@@ -460,6 +460,20 @@ document.getElementById("share-btn").addEventListener("click", function () {
 });
 
 
+document.getElementById('COPY-RESULTS-BUTTON').addEventListener('click', function () {
+    navigator.clipboard.writeText(fullShareText).then(() => {
+        const msg = document.getElementById('copy-message');
+        msg.classList.add('show');
+        setTimeout(() => {
+            msg.classList.remove('show');
+        }, 2000); // Hide after 2 seconds
+    }).catch(err => {
+        console.error("Copy failed: ", err);
+    });
+});
+
+
+
 document.getElementById("play-btn").addEventListener("click", function () {
     document.getElementById("game-intro").style.display = "none"; // Hide the overlay
     document.getElementById("how-to-play-popup").classList.remove("popup-hidden");
