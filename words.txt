@@ -73,3 +73,6 @@
 2025-06-28, hologramme
 2025-06-29, reflection
 2025-06-30, endangered
+2025-07-01, error word
+2025-07-02, cry babies
+2025-07-03, sunglasses
