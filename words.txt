@@ -76,3 +76,7 @@
 2025-07-01, error word
 2025-07-02, cry babies
 2025-07-03, sunglasses
+2025-07-03, swimmingly
+2025-07-04, splendidly
+2025-07-05, drag racer
+2025-07-06, chai latte
