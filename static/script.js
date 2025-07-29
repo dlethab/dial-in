@@ -434,6 +434,10 @@ document.addEventListener("DOMContentLoaded", function () {
     document.getElementById("guess-input-grid").addEventListener("click", function () {
         focusInput();
     });
+    document.getElementById("guess-input-grid").addEventListener("touchstart", function () {
+    focusInput();
+    });
+
 });
 
 
@@ -453,9 +457,17 @@ document.getElementById("close-popup").addEventListener("click", function () {
     popup.classList.remove("shareable-popup");
     popup.classList.add("hidden"); // ✅ Hide popup again
 });
+document.getElementById("close-popup").addEventListener("touchstart", function () {
+    let popup = document.getElementById("shareable-popup");
+    popup.classList.remove("shareable-popup");
+    popup.classList.add("hidden");
+});
 
 
 document.getElementById("share-btn").addEventListener("click", function () {
+    showShareablePopup(finalWinStatus, finalTotalSeconds);
+});
+document.getElementById("share-btn").addEventListener("touchstart", function () {
     showShareablePopup(finalWinStatus, finalTotalSeconds);
 });
 
@@ -471,11 +483,26 @@ document.getElementById('COPY-RESULTS-BUTTON').addEventListener('click', functio
         console.error("Copy failed: ", err);
     });
 });
+document.getElementById('COPY-RESULTS-BUTTON').addEventListener('touchstart', function () {
+    navigator.clipboard.writeText(fullShareText).then(() => {
+        const msg = document.getElementById('copy-message');
+        msg.classList.add('show');
+        setTimeout(() => {
+            msg.classList.remove('show');
+        }, 2000);
+    }).catch(err => {
+        console.error("Copy failed: ", err);
+    });
+});
 
 
 
 document.getElementById("play-btn").addEventListener("click", function () {
     document.getElementById("game-intro").style.display = "none"; // Hide the overlay
+    document.getElementById("how-to-play-popup").classList.remove("popup-hidden");
+});
+document.getElementById("play-btn").addEventListener("touchstart", function () {
+    document.getElementById("game-intro").style.display = "none";
     document.getElementById("how-to-play-popup").classList.remove("popup-hidden");
 });
 
@@ -494,6 +521,18 @@ document.getElementById("help-icon").addEventListener("click", function () {
     // ✅ Open How to Play
     howToPopup.classList.remove("popup-hidden");
 });
+document.getElementById("help-icon").addEventListener("touchstart", function () {
+    const sharePopup = document.getElementById("shareable-popup");
+    const howToPopup = document.getElementById("how-to-play-popup");
+
+    if (!sharePopup.classList.contains("hidden")) {
+        sharePopup.classList.add("hidden");
+        sharePopup.classList.remove("shareable-popup");
+    }
+
+    howToPopup.classList.remove("popup-hidden");
+});
+
 
 // ✅ Close How to Play popup
 document.getElementById("close-how-to-play").addEventListener("click", function () {
@@ -501,10 +540,20 @@ document.getElementById("close-how-to-play").addEventListener("click", function 
     focusInput();
     startGameTimer(); // ✅ Start only once
 });
+document.getElementById("close-how-to-play").addEventListener("touchstart", function () {
+    document.getElementById("how-to-play-popup").classList.add("popup-hidden");
+    focusInput();
+    startGameTimer();
+});
 
 
 // ✅ Close popup when PLAY button is clicked
 document.getElementById("play-button").addEventListener("click", function () {
+    document.getElementById("how-to-play-popup").classList.add("popup-hidden");
+    focusInput();
+    startGameTimer();
+});
+document.getElementById("play-button").addEventListener("touchstart", function () {
     document.getElementById("how-to-play-popup").classList.add("popup-hidden");
     focusInput();
     startGameTimer();
@@ -521,6 +570,9 @@ function focusInput() {
 
 // ✅ Refocus when the user taps the guess input grid
 document.getElementById("guess-input-grid").addEventListener("click", function () {
+    focusInput();
+});
+document.getElementById("guess-input-grid").addEventListener("touchstart", function () {
     focusInput();
 });
 
