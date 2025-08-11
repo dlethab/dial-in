@@ -1,11 +1,1 @@
-Current status:
-
-not deployed to docker
-
-not hosted
-
-Updates:
-Active Keypad.
-Improved share popup.
-User Auth
-
+very fun brain teaser game to decode phone number into hidden word/phrase
