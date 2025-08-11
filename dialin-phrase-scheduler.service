@@ -1,0 +1,16 @@
+[Unit]
+Description=Dialin Phrase Auto-Scheduler
+After=network.target
+
+[Service]
+Type=simple
+User=YOUR_USERNAME
+WorkingDirectory=/path/to/your/dialin/project
+ExecStart=/usr/bin/python3 /path/to/your/dialin/project/auto_phrase_scheduler.py
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target 
