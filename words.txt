@@ -173,8 +173,8 @@
 2025-12-02, journalism
 2025-12-03, challenger
 2025-12-04, high power
-2025-12-05, fast camel
-2025-12-06, drag racer
+2025-12-05, chicagoibm
+2025-12-06, ibmchicago
 2025-12-07, abbreviate
 2025-12-08, wrong turn
 2025-12-09, university
@@ -204,8 +204,8 @@
 2026-01-02, swimmingly
 2026-01-03, expression
 2026-01-04, green room
-2026-01-05, chicagoibm
-2026-01-06, chicagoibm
+2026-01-05, easy peasy
+2026-01-06, understand
 2026-01-07, good apple
 2026-01-08, plagiarize
 2026-01-09, high class
