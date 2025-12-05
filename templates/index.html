@@ -19,8 +19,10 @@
     <title>Dial In</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
     <script src="{{ url_for('static', filename='script.js') }}" defer></script>
-    <!-- ✅ Load Lexend font -->
-    <!--<link href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;600&display=swap" rel="stylesheet"> -->
+    <link rel="icon" href="static/logoMini.png" type="image/png">
+    <!-- Apple Touch Icon (for iOS devices)         Android Icon -->
+    <link rel="apple-touch-icon" href="static/logoMini.png">
+    <link rel="icon" sizes="192x192" href="static/logoMini.png">
 </head>
 <body>
     <div id="game-intro">
@@ -34,7 +36,9 @@
 
     <!-- ✅ Toolbar at the top -->
     <div id="toolbar">
-        <img src="static/logo.png" alt="Game Logo" class="toolbar-logo">
+        <a href="/">
+            <img src="static/logoMini.png" alt="Game Logo" class="toolbar-logo">
+        </a>
         <p id="game-info">Dial In #{{ game_number }} – {{ current_date }}</p>
         <div id="help-icon">?</div>
     </div>
@@ -43,13 +47,16 @@
     <div id="how-to-play-popup" class="popup-hidden">
         <div class="popup-content">
             <button id="close-how-to-play">✖</button>
-            <h2>How To Play</h2>
-            <p>Guess the 10-letter word or phrase in 3 tries.</p>
-            <ul>
-                <li>Each guess must be a valid 10-letter word or phrase.</li>
-                <li>Decipher the hidden code by matching the letters to the numbers from the keypad.</li>
-                <li>The color of the boxes will show if you've placed a letter in the correct spot.</li>
-            </ul>
+            <h2>How to Play</h2>
+                <p>Decode the secret phone number into a 10-letter word or phrase. You have 3 tries!</p>
+                <ul>
+                <li>You'll be given a <strong>10-digit code</strong> — think of it as a phone number.</li>
+                <li>Each number matches the letters on a classic <strong>T9 keypad</strong> (e.g. 2 = A, B, C).</li>
+                <li>Type your guess and submit. Correct letters will turn <span style="color:green;">green</span>.</li>
+                <li><strong>0</strong> represents a space between words.</li>
+                <li>Try to solve it in the <strong>fewest guesses</strong> and the <strong>fastest time</strong> — then share your score!</li>
+                </ul>
+
 
         <!-- ✅ Number Mapping Visual -->
         <div class="number-mapping">
@@ -101,15 +108,23 @@
     
     <div class="container" id="game-container">
         <div id="game-timer" class="game-timer">0:00</div>
+        
 
-        <input type="text" id="hidden-mobile-input" maxlength="1">
+        
+        <!--<div class="number-code" data-word="{{ word }}"></div>-->
+        <!-- ✅ No data-word attribute anymore -->
+        <div id="number-grid" class="grid">
+            {% for digit in number_code %}
+                <div class="grid-cell">{{ digit }}</div>
+            {% endfor %}
+        </div>
 
-
-        <div class="number-code" data-word="{{ word }}"></div>
         <div id="number-grid" class="grid"></div>
         <div id="guess-container"></div>
 
         <div id="guess-input-grid" class="grid"></div>
+        <input id="hidden-mobile-input" style="position:absolute; top:-100px; opacity:0;" />
+
 
         <!--add image-->
         <div id="keyboard-container">
@@ -134,8 +149,15 @@
 
                 <p id="code-word"></p>
                 <p id="final-time" class="final-time-text"></p>
-                <p id="shareable-text"></p>
-                <button id="copy-btn">Copy</button>
+                <p id="shareable-text">DEFAULT SHARE TEXT</p>
+
+                <div id="results-button-container">
+                    <button id="SHARE-RESULTS-BUTTON">SHARE</button>
+                    <button id="COPY-RESULTS-BUTTON">COPY</button>
+                </div>
+
+                <div id="copy-message">Copied to clipboard</div>
+  
                 <!-- ✅ Countdown Message -->
                 <p id="play-again-message" class="countdown-message">
                     Want to play again?<br>
@@ -147,5 +169,50 @@
             </div>
         </div>
     </div>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            const shareBtn = document.getElementById("SHARE-RESULTS-BUTTON");
+            const websiteLink = "https://dialin.fun";
+            if (!shareBtn) return;
+
+            
+        
+            shareBtn.addEventListener("click", function () {
+                const shareTextEl = document.getElementById("shareable-text");
+                if (!shareTextEl) return;
+
+                const shareText = shareTextEl.innerText;
+                const fullMessage = `${shareText}\n${websiteLink}`;
+                if (navigator.share) {
+
+                    console.log("Full message to share/copy:", fullMessage);
+                    navigator.share({
+                        text: fullMessage,
+                    }).then(() => {
+                        console.log("Shared successfully via Web Share API");
+                    }).catch(err => {
+                        console.error("Web Share failed:", err);
+                    });
+                } else {
+                    console.log("Web Share API not supported. Using fallback copy.");
+                    const textArea = document.createElement("textarea");
+                    textArea.value = fullMessage;
+                    document.body.appendChild(textArea);
+                    textArea.select();
+                    try {
+                        document.execCommand("copy");
+                        console.log("Copied to clipboard!");
+                        alert("Copied to clipboard!");
+                    } catch (err) {
+                        console.error("Fallback copy failed:", err);
+                    }
+                    document.body.removeChild(textArea);
+                }
+            });
+        });
+        </script>
+        
+        
 </body>
 </html>
