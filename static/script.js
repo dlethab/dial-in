@@ -1,400 +1,580 @@
-let remainingAttempts = 3;
-let guessProgress = [];
+/* ==========================================================================
+   Dial In
+   ========================================================================== */
+
+const WORD_LENGTH = 10;
+const MAX_ATTEMPTS = 3;
+const MULTI_TAP_MS = 1000;   // how long a key keeps cycling letters before it locks in
+const REVEAL_STEP_MS = 70;   // delay between each tile flip
+
+const KEYPAD = {
+    '2': 'ABC', '3': 'DEF',
+    '4': 'GHI', '5': 'JKL', '6': 'MNO',
+    '7': 'PQRS', '8': 'TUV', '9': 'WXYZ',
+    '0': ' '
+};
+
+// Real touch-tone frequencies (low, high) for each key
+const DTMF = {
+    '1': [697, 1209], '2': [697, 1336], '3': [697, 1477],
+    '4': [770, 1209], '5': [770, 1336], '6': [770, 1477],
+    '7': [852, 1209], '8': [852, 1336], '9': [852, 1477],
+    '*': [941, 1209], '0': [941, 1336], '#': [941, 1477]
+};
+
+const gameNumber = document.body.dataset.gameNumber;
+
+let remainingAttempts = MAX_ATTEMPTS;
 let emojiFeedbackGrid = [];
-
 let gameOver = false;
-let correctWordArray = [];
-let currentIndex = 0; // Track the currently active cell
+let submitting = false;
 
+// Current guess
+let letters = new Array(WORD_LENGTH).fill(null);
+let cursor = 0;
+let pending = null;          // { key, index, cycle } while a key is mid multi-tap
+let pendingTimer = null;
 
+// Timer
 let timerStarted = false;
 let timerInterval = null;
 let startTime = null;
 let totalTime = 0; // in seconds
 
-
+// Results
 let finalWinStatus = null;
 let finalTotalSeconds = null;
 let finalAnswerWord = "";
+let fullShareText = "";
+
+const $ = id => document.getElementById(id);
 
 
+/* ==========================================================================
+   Input grid
+   ========================================================================== */
 
-//pull date and game # from html
-const gameInfoText = document.getElementById("game-info").innerText;
-// Split the text to get the game number and current date
-const parts = gameInfoText.split(" – ");
-const gameNumber = parts[0].replace("Dial In #", "").trim();  // Extracts the game number
-const currentDate = parts[1].trim();  // Extracts the current date
-console.log('Game Number:', gameNumber);
-console.log('Current Date:', currentDate);
+function createInputGrid() {
+    const inputGrid = $("guess-input-grid");
+    inputGrid.innerHTML = "";
 
-
-function displayNumberGrid(wordArray) {
-    console.log(wordArray);
-    const numberGrid = document.getElementById("number-grid");
-    numberGrid.innerHTML = "";
-    wordArray.forEach(char => {
+    for (let i = 0; i < WORD_LENGTH; i++) {
         const cell = document.createElement("div");
-        cell.classList.add("grid-cell");
-        cell.textContent = convertLetterToNumber(char);
-        numberGrid.appendChild(cell);
+        cell.classList.add("grid-cell", "input-cell");
+        cell.dataset.index = i;
+        cell.addEventListener("click", () => moveCursorTo(i));
+        inputGrid.appendChild(cell);
+    }
+    renderInput();
+}
+
+function inputCells() {
+    return document.querySelectorAll(".input-cell");
+}
+
+function renderInput() {
+    const cells = inputCells();
+    cells.forEach((cell, i) => {
+        const letter = letters[i];
+        cell.textContent = letter && letter !== " " ? letter : "";
+        cell.classList.toggle("filled", letter !== null);
+        cell.classList.toggle("is-space", letter === " ");
+        cell.classList.toggle("active-cell", i === cursor && !gameOver);
+        if (!pending || pending.index !== i) cell.classList.remove("pending");
+    });
+    checkInput();
+}
+
+function checkInput() {
+    const submitBtn = $("submit-btn");
+    const isValid = letters.every(l => l !== null);
+
+    submitBtn.disabled = !isValid;
+    submitBtn.classList.toggle("disabled", !isValid);
+    submitBtn.classList.toggle("active", isValid);
+
+    $("delete-btn").classList.toggle("empty", letters.every(l => l === null));
+}
+
+function popCell(index) {
+    const cell = inputCells()[index];
+    if (!cell) return;
+    cell.classList.remove("pop");
+    void cell.offsetWidth; // restart animation
+    cell.classList.add("pop");
+}
+
+function markPending(index) {
+    const cell = inputCells()[index];
+    if (!cell) return;
+    cell.classList.remove("pending");
+    void cell.offsetWidth; // restart the countdown bar
+    cell.classList.add("pending");
+}
+
+function shakeInput() {
+    const grid = $("guess-input-grid");
+    if (!grid) return;
+    grid.classList.remove("shake");
+    void grid.offsetWidth;
+    grid.classList.add("shake");
+}
+
+
+/* ==========================================================================
+   Typing
+   ========================================================================== */
+
+function commitPending() {
+    clearTimeout(pendingTimer);
+    pendingTimer = null;
+    pending = null;
+}
+
+function armPending() {
+    clearTimeout(pendingTimer);
+    pendingTimer = setTimeout(() => {
+        commitPending();
+        renderInput();
+    }, MULTI_TAP_MS);
+}
+
+// Phone-style multi-tap: repeated taps on the same key cycle its letters
+function pressDigit(digit) {
+    if (!canType()) return;
+
+    const chars = KEYPAD[digit];
+    if (!chars) {
+        shakeInput();
+        return;
+    }
+
+    if (pending && pending.key === digit) {
+        pending.cycle = (pending.cycle + 1) % chars.length;
+        letters[pending.index] = chars[pending.cycle];
+        renderInput();
+        markPending(pending.index);
+        popCell(pending.index);
+        armPending();
+        return;
+    }
+
+    commitPending();
+
+    if (cursor >= WORD_LENGTH) {
+        shakeInput();
+        return;
+    }
+
+    const index = cursor;
+    letters[index] = chars[0];
+    cursor = index + 1;
+
+    if (chars.length > 1) {
+        pending = { key: digit, index, cycle: 0 };
+        armPending();
+    }
+
+    renderInput();
+    if (pending) markPending(index);
+    popCell(index);
+}
+
+// Physical keyboard: letters go straight in
+function typeLetter(letter) {
+    if (!canType()) return;
+    commitPending();
+
+    if (cursor >= WORD_LENGTH) {
+        shakeInput();
+        return;
+    }
+
+    letters[cursor] = letter;
+    const index = cursor;
+    cursor++;
+    renderInput();
+    popCell(index);
+}
+
+function deleteLetter() {
+    if (!canType()) return;
+    commitPending();
+
+    if (cursor < WORD_LENGTH && letters[cursor] !== null) {
+        letters[cursor] = null;
+    } else if (cursor > 0) {
+        cursor--;
+        letters[cursor] = null;
+    }
+    renderInput();
+}
+
+function clearGuess() {
+    if (!canType()) return;
+    commitPending();
+    letters.fill(null);
+    cursor = 0;
+    renderInput();
+}
+
+// "#": lock in the cycling letter, or step forward a cell
+function nextCell() {
+    if (!canType()) return;
+    if (pending) {
+        commitPending();
+    } else if (cursor < WORD_LENGTH) {
+        cursor++;
+    }
+    renderInput();
+}
+
+function moveCursorTo(index) {
+    if (!canType()) return;
+    commitPending();
+    cursor = Math.max(0, Math.min(WORD_LENGTH, index));
+    renderInput();
+}
+
+function canType() {
+    return !gameOver && !submitting && !isAnyModalOpen();
+}
+
+
+/* ==========================================================================
+   Keypad
+   ========================================================================== */
+
+function handleKeypadAction(key) {
+    playTone(key);
+    buzz();
+
+    if (key === "*") clearGuess();
+    else if (key === "#") nextCell();
+    else pressDigit(key);
+}
+
+function flashKey(key) {
+    const button = document.querySelector(`.key[data-key="${CSS.escape(key)}"]`);
+    if (!button) return;
+    button.classList.add("pressed");
+    setTimeout(() => button.classList.remove("pressed"), 120);
+}
+
+// Fire on pointerdown for a snappy, phone-like feel; keep click for keyboard activation
+function bindPress(element, action) {
+    element.addEventListener("pointerdown", event => {
+        if (event.button !== 0) return;
+        event.preventDefault();
+        element.classList.add("pressed");
+        action();
+    });
+
+    const release = () => element.classList.remove("pressed");
+    element.addEventListener("pointerup", release);
+    element.addEventListener("pointerleave", release);
+    element.addEventListener("pointercancel", release);
+
+    element.addEventListener("click", event => {
+        if (event.detail === 0) action(); // Enter / Space on a focused button
     });
 }
 
-function convertLetterToNumber(letter) {
-    const keypad = {
-        'A': '2', 'B': '2', 'C': '2',
-        'D': '3', 'E': '3', 'F': '3',
-        'G': '4', 'H': '4', 'I': '4',
-        'J': '5', 'K': '5', 'L': '5',
-        'M': '6', 'N': '6', 'O': '6',
-        'P': '7', 'Q': '7', 'R': '7', 'S': '7',
-        'T': '8', 'U': '8', 'V': '8',
-        'W': '9', 'X': '9', 'Y': '9', 'Z': '9',
-        ' ': '0'
-    };
-    return keypad[letter] || '-';
+function setupKeypad() {
+    document.querySelectorAll(".keypad .key").forEach(button => {
+        bindPress(button, () => handleKeypadAction(button.dataset.key));
+    });
+
+    bindPress($("delete-btn"), () => {
+        buzz();
+        deleteLetter();
+    });
+
+    bindPress($("submit-btn"), () => {
+        if (!$("submit-btn").disabled) submitGuess();
+    });
 }
 
+
+/* ==========================================================================
+   Sound + haptics
+   ========================================================================== */
+
+let audioCtx = null;
+let soundOn = localStorage.getItem("dialin-sound") !== "off";
+
+function playTone(key) {
+    if (!soundOn || !DTMF[key]) return;
+
+    try {
+        audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+        if (audioCtx.state === "suspended") audioCtx.resume();
+
+        const now = audioCtx.currentTime;
+        const gain = audioCtx.createGain();
+        gain.gain.setValueAtTime(0, now);
+        gain.gain.linearRampToValueAtTime(0.07, now + 0.01);
+        gain.gain.setValueAtTime(0.07, now + 0.1);
+        gain.gain.linearRampToValueAtTime(0, now + 0.14);
+        gain.connect(audioCtx.destination);
+
+        DTMF[key].forEach(freq => {
+            const osc = audioCtx.createOscillator();
+            osc.type = "sine";
+            osc.frequency.value = freq;
+            osc.connect(gain);
+            osc.start(now);
+            osc.stop(now + 0.15);
+        });
+    } catch (err) {
+        // Audio is a nice-to-have; ignore failures
+    }
+}
+
+function buzz() {
+    if (navigator.vibrate) navigator.vibrate(8);
+}
+
+function renderSoundToggle() {
+    $("sound-toggle").classList.toggle("muted", !soundOn);
+}
+
+$("sound-toggle").addEventListener("click", () => {
+    soundOn = !soundOn;
+    localStorage.setItem("dialin-sound", soundOn ? "on" : "off");
+    renderSoundToggle();
+});
+
+
+/* ==========================================================================
+   Guessing
+   ========================================================================== */
+
 function submitGuess() {
-    if (gameOver) return;
+    if (gameOver || submitting) return;
+    commitPending();
 
-    const cells = document.querySelectorAll(".input-cell");
-
-    // Collect user input from the grid
-    let guess = Array.from(cells)
-        .map(cell => (cell.textContent.length === 0 ? " " : cell.textContent))
-        .join("");
-
-    if (guess.length !== 10) {
-        console.error("Error: Guess is not exactly 10 characters.");
+    if (letters.some(l => l === null)) {
+        shakeInput();
         return;
     }
+
+    const guess = letters.join("");
+    submitting = true;
 
     fetch("/submit", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
             guess: guess,
-            remainingAttempts: remainingAttempts // 👈 Add this if it's not here yet
+            remainingAttempts: remainingAttempts
         })
     })
-    
     .then(res => res.json())
     .then(data => {
         if (data.result === "error") {
-            console.error("❌ Invalid submission:", data.message);
+            console.error("Invalid submission:", data.message);
+            submitting = false;
+            shakeInput();
             return;
         }
 
-        // Track the guess
-        guessProgress.push(guess);
+        if (data.word) {
+            finalAnswerWord = data.word;
+        }
 
-        // Highlight the guess using server-provided match indexes
-        displayGuess(guess, data.matches);
         let emojiRow = "";
         for (let i = 0; i < guess.length; i++) {
             emojiRow += data.matches.includes(i) ? "🟩" : "⬛️";
         }
-        console.log(emojiRow)
         emojiFeedbackGrid.push(emojiRow);
 
-        if (data.word) {
-            finalAnswerWord = data.word; // ✅ global variable
+        remainingAttempts = Math.max(0, remainingAttempts - 1);
+        const dot = $("dot" + (remainingAttempts + 1));
+        if (dot) dot.classList.add("used");
+
+        const isWin = data.result === "correct";
+        const isLast = isWin || remainingAttempts <= 0;
+
+        if (isLast) {
+            gameOver = true;
+            finalTotalSeconds = stopGameTimer();
         }
 
-        // Reduce remaining attempts
-        if (remainingAttempts > 0) {
-            remainingAttempts--;
-        }
+        const row = displayGuess(guess, data.matches);
+        letters.fill(null);
+        cursor = 0;
 
-        // Hide dot indicator
-        let dotElement = document.getElementById("dot" + (remainingAttempts + 1));
-        if (dotElement) {
-            dotElement.style.visibility = "hidden";
-        }
-
-        // End game on correct guess or final attempt
-        if (data.result === "correct" || remainingAttempts <= 0) {
-            endGame(data.result === "correct");
+        if (isLast) {
+            removeInputGrid();
         } else {
-            setTimeout(() => {
-                if (!gameOver) clearInputGrid();
-            }, 0);
+            renderInput();
         }
+
+        const revealTime = WORD_LENGTH * REVEAL_STEP_MS + 400;
+        setTimeout(() => {
+            submitting = false;
+            if (isLast) {
+                if (isWin) row.classList.add("win");
+                setTimeout(() => endGame(isWin), isWin ? 700 : 300);
+            }
+        }, revealTime);
     })
     .catch(err => {
         console.error("Guess submission failed:", err);
+        submitting = false;
     });
 }
 
-
 function displayGuess(guessString, matchIndexes = []) {
-    const guessContainer = document.getElementById("guess-container");
-    let guessArray = guessString.split("");
+    const guessContainer = $("guess-container");
+    const guessRow = document.createElement("div");
+    guessRow.classList.add("guess-row");
 
-    let guessRow;
-
-    if (gameOver) {
-        guessRow = guessContainer.lastElementChild;
-        console.log("🏁 Game Over: Updating the final guess row.");
-    } else {
-        guessRow = document.createElement("div");
-        guessRow.classList.add("guess-row");
-    }
-
-    guessRow.innerHTML = "";
-
-    guessArray.forEach((letter, index) => {
+    guessString.split("").forEach((letter, index) => {
         const cell = document.createElement("div");
         cell.classList.add("grid-cell");
-        cell.textContent = letter;
+        cell.textContent = letter === " " ? "" : letter;
+        if (letter === " ") cell.classList.add("is-space");
 
-        if (matchIndexes.includes(index)) {
-            cell.classList.add("correct"); // ✅ Apply green if correct
-        }
+        const delay = index * REVEAL_STEP_MS;
+        cell.style.animationDelay = `${delay}ms`;
+        cell.classList.add("reveal");
+
+        // Swap the color at the midpoint of the flip
+        setTimeout(() => {
+            cell.classList.add(matchIndexes.includes(index) ? "correct" : "incorrect");
+        }, delay + 180);
 
         guessRow.appendChild(cell);
     });
 
-    if (!gameOver) {
-        guessContainer.appendChild(guessRow);
-    }
-}
+    guessContainer.appendChild(guessRow);
 
+    const board = $("board");
+    requestAnimationFrame(() => {
+        board.scrollTo({ top: board.scrollHeight, behavior: "smooth" });
+    });
 
-
-function clearInputGrid() {
-    if (gameOver) return; // Prevents clearing the grid if the game has ended
-
-    const cells = document.querySelectorAll(".input-cell");
-    cells.forEach(cell => (cell.textContent = ""));
-    currentIndex = 0; // Reset input cursor to the first cell
-    highlightCurrentCell(currentIndex);
-    document.dispatchEvent(new KeyboardEvent("keydown", { key: "Backspace" }));
+    return guessRow;
 }
 
 function removeInputGrid() {
-    const inputGrid = document.getElementById("guess-input-grid");
-    if (inputGrid) {
-        inputGrid.remove(); // ✅ Completely removes the element
-        console.log("🗑️ Input grid removed from HTML after game over.");
-    }
+    const inputGrid = $("guess-input-grid");
+    if (inputGrid) inputGrid.remove();
 }
-
-
-
-
-function createInputGrid() {
-    const inputGrid = document.getElementById("guess-input-grid");
-
-    if (!inputGrid) {
-        console.error("Error: #guess-input-grid element not found.");
-        return;
-    }
-
-    inputGrid.innerHTML = ""; // Clear previous grid
-
-    for (let i = 0; i < 10; i++) {
-        const cell = document.createElement("div");
-        cell.classList.add("grid-cell", "input-cell");
-        cell.dataset.index = i; // Store index for reference
-        cell.textContent = ""; // Initially empty
-        inputGrid.appendChild(cell);
-    }
-
-    document.addEventListener("keydown", handleTyping); // Listen for typing events
-    highlightCurrentCell(0); // Start with the first cell selected
-}
-
-document.addEventListener("keydown", function (event) {
-    const popup = document.getElementById("how-to-play-popup");
-    const introVisible = document.getElementById("game-intro").style.display !== "none";
-
-    if (introVisible && event.key === "Enter") {
-        document.getElementById("play-btn").click();
-    } else if (!popup.classList.contains("popup-hidden") && event.key === "Enter") {
-        startGameTimer();
-        document.getElementById("play-button").click();
-
-    } else if (event.key === "Enter" && !gameOver) {
-        let submitButton = document.getElementById("submit-btn");
-
-        // Only trigger submitGuess() if the button is enabled
-        if (!submitButton.disabled) {
-            submitGuess();
-        }
-    }
-});
-
-
-
-function handleTyping(event) {
-    const cells = document.querySelectorAll(".input-cell");
-
-    // Allow letters A-Z and spaces
-    if ((event.key.match(/^[a-zA-Z]$/) || event.key === " ") && currentIndex < 10) {
-        cells[currentIndex].textContent = event.key === " " ? " " : event.key.toUpperCase();
-        currentIndex++;
-    } 
-    // Handle Backspace to move backward
-    else if (event.key === "Backspace" && currentIndex > 0) {
-        currentIndex--;
-        cells[currentIndex].textContent = "";
-    }
-
-    highlightCurrentCell(currentIndex);
-    checkInput(); // Enable or disable the enter button
-}
-
-
-function highlightCurrentCell(index) {
-    const cells = document.querySelectorAll(".input-cell");
-    cells.forEach(cell => cell.classList.remove("active-cell")); // Remove previous highlight
-    if (index < 10) {
-        cells[index].classList.add("active-cell"); // Highlight current cell
-    }
-}
-
-function checkInput() {
-    const cells = document.querySelectorAll(".input-cell");
-
-    // Build the guess
-    let guess = Array.from(cells).map(cell =>
-        (cell.textContent.length === 0 ? "_" : cell.textContent)
-    ).join("");
-
-    const submitBtn = document.getElementById("submit-btn");
-    const isValid = guess.length === 10 && !guess.includes("_");
-
-    // Enable/disable button
-    submitBtn.disabled = !isValid;
-
-    // Toggle visual classes
-    if (isValid) {
-        submitBtn.classList.remove("disabled");
-        submitBtn.classList.add("active");
-    } else {
-        submitBtn.classList.add("disabled");
-        submitBtn.classList.remove("active");
-    }
-}
-
-
-document.addEventListener("DOMContentLoaded", () => {
-    createInputGrid();
-});
-
-document.getElementById("submit-btn").onclick = function () {
-    if (!gameOver && !this.disabled) {
-        submitGuess();
-    }
-};
 
 function endGame(isWin) {
-    gameOver = true;
     finalWinStatus = isWin;
-    finalTotalSeconds = stopGameTimer();
 
-    let mobileInput = document.getElementById("hidden-mobile-input");
-    // Remove focus from the input field to close the keyboard
-    mobileInput.blur();
+    $("game-container").classList.add("game-over");
+    $("share-btn").classList.remove("hidden-share");
 
-    // Hide submit button and disable input grid
-    document.getElementById("submit-btn").style.display = "none";
-    removeInputGrid()
-
-    console.log("Final guess locked in. No new input allowed.");
-    
     showShareablePopup(isWin, finalTotalSeconds);
 }
 
-function showShareablePopup(isWin, finalTotalSeconds) {
-    console.log("📢 in shareable function");
 
-    let shareablePopup = document.getElementById("shareable-popup");
-    console.log("Popup Element:", shareablePopup);
+/* ==========================================================================
+   Results
+   ========================================================================== */
 
-    if (!shareablePopup) {
-        console.error("❌ Error: #shareable-popup element not found in DOM!");
+function showShareablePopup(isWin, totalSeconds) {
+    let message;
+    if (!isWin) {
+        message = "Better luck next time!";
+    } else if (remainingAttempts === 2) {
+        message = "You're a star. Mom and Dad would be proud";
+    } else if (remainingAttempts === 1) {
+        message = "Super!";
+    } else {
+        message = "Get it together man";
+    }
+
+    const emojiGrid = emojiFeedbackGrid.join("\n");
+
+    if (isWin) {
+        fullShareText = `DIAL IN #${gameNumber} solved in ${formatTime(totalSeconds)}!\n${emojiGrid}`;
+        $("final-time").textContent = `Solved in ${formatTime(totalSeconds)}`;
+    } else {
+        fullShareText = `DIAL IN #${gameNumber} defeated me!\n${emojiGrid}`;
+        $("final-time").textContent = "";
+    }
+
+    $("shareable-text").innerText = fullShareText;
+    $("popup-message").innerText = message;
+    $("code-word").innerText = finalAnswerWord ? `"${finalAnswerWord}"` : "";
+
+    openModal("shareable-popup");
+}
+
+function shareResults() {
+    const fullMessage = `${fullShareText}\nhttps://dialin.fun`;
+
+    if (navigator.share) {
+        navigator.share({ text: fullMessage }).catch(err => {
+            if (err.name !== "AbortError") console.error("Web Share failed:", err);
+        });
+    } else {
+        copyText(fullMessage);
+    }
+}
+
+function copyText(text) {
+    const done = () => {
+        const msg = $("copy-message");
+        msg.classList.add("show");
+        setTimeout(() => msg.classList.remove("show"), 2000);
+    };
+
+    if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(text).then(done).catch(err => console.error("Copy failed:", err));
         return;
     }
 
-    // ✅ Determine the message based on the number of attempts
-    let message;
-    if (remainingAttempts === 2) {
-        message = "You're a star. Mom and Dad would be proud"; // ✅ First try
-    } else if (remainingAttempts === 1) {
-        message = "Super!"; // ✅ Two tries
-    } else if (remainingAttempts === 0 ) {
-        message = "Get it together man"; // ✅ Three tries
-    } else {
-        message = "Better Luck Next Time!"; // ✅ User failed
+    const textArea = document.createElement("textarea");
+    textArea.value = text;
+    textArea.style.position = "fixed";
+    textArea.style.opacity = "0";
+    document.body.appendChild(textArea);
+    textArea.select();
+    try {
+        document.execCommand("copy");
+        done();
+    } catch (err) {
+        console.error("Fallback copy failed:", err);
     }
-
-    // ✅ Generate emoji-based representation of guesses
-    let emojiGrid = emojiFeedbackGrid.join("\n");
-
-        
-
-    if (isWin) {
-        fullShareText = `DIAL IN #${gameNumber} solved in ${formatTime(finalTotalSeconds)}!\n${emojiGrid}`;
-        document.getElementById("shareable-text").innerText = fullShareText;
-    } else {
-        fullShareText = `DIAL IN #${gameNumber} defeated me!\n${emojiGrid}`;
-        document.getElementById("shareable-text").innerText = fullShareText;
-    }
-    
-
-    // ✅ Update the popup content
-    document.getElementById("popup-message").innerText = message; // Set dynamic message
-    document.getElementById("code-word").innerText = `"${finalAnswerWord}"`;
-
-    
-    // ✅ Remove "hidden" and add "shareable-popup" class to make it visible
-    shareablePopup.classList.remove("hidden");
-    shareablePopup.classList.add("shareable-popup");
-
-
-    // ✅ Show the Share button by removing `hidden-share`
-    document.getElementById("share-btn").classList.remove("hidden-share");
-
-    console.log("✅ Popup should be visible now.");
-    console.log(isWin)
+    document.body.removeChild(textArea);
 }
+
+$("SHARE-RESULTS-BUTTON").addEventListener("click", shareResults);
+$("COPY-RESULTS-BUTTON").addEventListener("click", () => copyText(`${fullShareText}\nhttps://dialin.fun`));
+$("share-btn").addEventListener("click", () => showShareablePopup(finalWinStatus, finalTotalSeconds));
 
 function updateCountdown() {
     const now = new Date();
-    const options = { timeZone: 'America/Chicago' };
-    const chicagoNow = new Date(now.toLocaleString('en-US', options));
+    const chicagoNow = new Date(now.toLocaleString('en-US', { timeZone: 'America/Chicago' }));
 
     const tomorrow = new Date(chicagoNow);
     tomorrow.setDate(chicagoNow.getDate() + 1);
     tomorrow.setHours(0, 0, 0, 0);
 
-    const diffMs = (tomorrow - chicagoNow) + 60000; // ⬅️ Add 1 minute
+    const diffMs = (tomorrow - chicagoNow) + 60000; // add 1 minute
     const hours = Math.floor(diffMs / (1000 * 60 * 60));
     const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
 
-    document.getElementById("countdown-hours").textContent =
-        `${hours} hour${hours !== 1 ? 's' : ''}`;
-    document.getElementById("countdown-minutes").textContent =
-        `${minutes} minute${minutes !== 1 ? 's' : ''}`;
+    $("countdown-hours").textContent = `${hours} hour${hours !== 1 ? 's' : ''}`;
+    $("countdown-minutes").textContent = `${minutes} minute${minutes !== 1 ? 's' : ''}`;
 }
 updateCountdown();
 setInterval(updateCountdown, 60000);
 
 
-/* timer logic to keep track of how long the user took to play */
-
+/* ==========================================================================
+   Timer
+   ========================================================================== */
 
 function startGameTimer() {
-    console.log("inside start timer");
-
-    if (timerStarted) return;
-    console.log("⏱️ startGameTimer() called");
-
-
+    if (timerStarted || gameOver) return;
     timerStarted = true;
     startTime = Date.now();
 
@@ -402,12 +582,13 @@ function startGameTimer() {
         totalTime = Math.floor((Date.now() - startTime) / 1000);
         const minutes = Math.floor(totalTime / 60);
         const seconds = totalTime % 60;
-        document.getElementById("game-timer").textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+        $("game-timer").textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
     }, 1000);
 }
 
 function stopGameTimer() {
     clearInterval(timerInterval);
+    if (startTime) totalTime = Math.floor((Date.now() - startTime) / 1000);
     return totalTime;
 }
 
@@ -422,165 +603,127 @@ function formatTime(seconds) {
 }
 
 
-document.addEventListener("DOMContentLoaded", function () {
-    let mobileInput = document.getElementById("hidden-mobile-input");
+/* ==========================================================================
+   Intro + modals
+   ========================================================================== */
 
-    // ✅ Use a delay to ensure the page loads fully before focusing
-    setTimeout(() => {
-        focusInput();
-    }, 500); // Slight delay to avoid browser restrictions
-
-    // ✅ Refocus when a user taps the input grid
-    document.getElementById("guess-input-grid").addEventListener("click", function () {
-        focusInput();
+function openModal(id) {
+    ["how-to-play-popup", "shareable-popup"].forEach(other => {
+        if (other !== id) $(other).classList.add("hidden");
     });
-    document.getElementById("guess-input-grid").addEventListener("touchstart", function () {
-    focusInput();
-    });
-
-});
-
-
-// ✅ Move to the next cell after typing a letter
-function moveToNextCell() {
-    let cells = document.querySelectorAll(".input-cell");
-    let currentIndex = Array.from(cells).findIndex(cell => cell.classList.contains("active-cell"));
-
-    if (currentIndex !== -1 && currentIndex < cells.length - 1) {
-        cells[currentIndex].classList.remove("active-cell");
-        cells[currentIndex + 1].classList.add("active-cell");
-    }
+    $(id).classList.remove("hidden");
 }
 
-document.getElementById("close-popup").addEventListener("click", function () {
-    let popup = document.getElementById("shareable-popup");
-    popup.classList.remove("shareable-popup");
-    popup.classList.add("hidden"); // ✅ Hide popup again
-});
-document.getElementById("close-popup").addEventListener("touchstart", function () {
-    let popup = document.getElementById("shareable-popup");
-    popup.classList.remove("shareable-popup");
-    popup.classList.add("hidden");
-});
-
-
-document.getElementById("share-btn").addEventListener("click", function () {
-    showShareablePopup(finalWinStatus, finalTotalSeconds);
-});
-document.getElementById("share-btn").addEventListener("touchstart", function () {
-    showShareablePopup(finalWinStatus, finalTotalSeconds);
-});
-
-
-document.getElementById('COPY-RESULTS-BUTTON').addEventListener('click', function () {
-    navigator.clipboard.writeText(fullShareText).then(() => {
-        const msg = document.getElementById('copy-message');
-        msg.classList.add('show');
-        setTimeout(() => {
-            msg.classList.remove('show');
-        }, 2000); // Hide after 2 seconds
-    }).catch(err => {
-        console.error("Copy failed: ", err);
-    });
-});
-document.getElementById('COPY-RESULTS-BUTTON').addEventListener('touchstart', function () {
-    navigator.clipboard.writeText(fullShareText).then(() => {
-        const msg = document.getElementById('copy-message');
-        msg.classList.add('show');
-        setTimeout(() => {
-            msg.classList.remove('show');
-        }, 2000);
-    }).catch(err => {
-        console.error("Copy failed: ", err);
-    });
-});
-
-
-
-document.getElementById("play-btn").addEventListener("click", function () {
-    document.getElementById("game-intro").style.display = "none"; // Hide the overlay
-    document.getElementById("how-to-play-popup").classList.remove("popup-hidden");
-});
-document.getElementById("play-btn").addEventListener("touchstart", function () {
-    document.getElementById("game-intro").style.display = "none";
-    document.getElementById("how-to-play-popup").classList.remove("popup-hidden");
-});
-
-
-// ✅ Open How to Play popup
-document.getElementById("help-icon").addEventListener("click", function () {
-    const sharePopup = document.getElementById("shareable-popup");
-    const howToPopup = document.getElementById("how-to-play-popup");
-
-    // ✅ Close shareable popup if it's open
-    if (!sharePopup.classList.contains("hidden")) {
-        sharePopup.classList.add("hidden");
-        sharePopup.classList.remove("shareable-popup"); // Optional: reset any added classes
-    }
-
-    // ✅ Open How to Play
-    howToPopup.classList.remove("popup-hidden");
-});
-document.getElementById("help-icon").addEventListener("touchstart", function () {
-    const sharePopup = document.getElementById("shareable-popup");
-    const howToPopup = document.getElementById("how-to-play-popup");
-
-    if (!sharePopup.classList.contains("hidden")) {
-        sharePopup.classList.add("hidden");
-        sharePopup.classList.remove("shareable-popup");
-    }
-
-    howToPopup.classList.remove("popup-hidden");
-});
-
-
-// ✅ Close How to Play popup
-document.getElementById("close-how-to-play").addEventListener("click", function () {
-    document.getElementById("how-to-play-popup").classList.add("popup-hidden");
-    focusInput();
-    startGameTimer(); // ✅ Start only once
-});
-document.getElementById("close-how-to-play").addEventListener("touchstart", function () {
-    document.getElementById("how-to-play-popup").classList.add("popup-hidden");
-    focusInput();
-    startGameTimer();
-});
-
-
-// ✅ Close popup when PLAY button is clicked
-document.getElementById("play-button").addEventListener("click", function () {
-    document.getElementById("how-to-play-popup").classList.add("popup-hidden");
-    focusInput();
-    startGameTimer();
-});
-document.getElementById("play-button").addEventListener("touchstart", function () {
-    document.getElementById("how-to-play-popup").classList.add("popup-hidden");
-    focusInput();
-    startGameTimer();
-});
-
-
-function focusInput() {
-    let mobileInput = document.getElementById("hidden-mobile-input");
-    let guessGrid = document.getElementById("guess-input-grid");
-    let focusSpot = document.getElementById("guess-container");
-
-    mobileInput.focus();
+function closeModal(id) {
+    $(id).classList.add("hidden");
 }
 
-// ✅ Refocus when the user taps the guess input grid
-document.getElementById("guess-input-grid").addEventListener("click", function () {
-    focusInput();
-});
-document.getElementById("guess-input-grid").addEventListener("touchstart", function () {
-    focusInput();
+function isAnyModalOpen() {
+    return !$("how-to-play-popup").classList.contains("hidden")
+        || !$("shareable-popup").classList.contains("hidden")
+        || isIntroVisible();
+}
+
+function isIntroVisible() {
+    return $("game-intro").style.display !== "none";
+}
+
+function closeHowToPlay() {
+    closeModal("how-to-play-popup");
+    startGameTimer();
+}
+
+$("play-btn").addEventListener("click", () => {
+    $("game-intro").style.display = "none";
+    openModal("how-to-play-popup");
 });
 
-// ✅ Call `focusInput()` whenever a new grid is added after a guess
-function createNewGuessInputGrid() {
-    let newGrid = document.createElement("div");
-    newGrid.classList.add("guess-row");
-    document.getElementById("guess-container").appendChild(newGrid);
-    
-    focusInput(); // ✅ Ensures keyboard opens immediately
+$("help-icon").addEventListener("click", () => openModal("how-to-play-popup"));
+$("close-how-to-play").addEventListener("click", closeHowToPlay);
+$("play-button").addEventListener("click", closeHowToPlay);
+$("close-popup").addEventListener("click", () => closeModal("shareable-popup"));
+
+// Tap the dimmed backdrop to close
+$("how-to-play-popup").addEventListener("click", event => {
+    if (event.target === event.currentTarget) closeHowToPlay();
+});
+$("shareable-popup").addEventListener("click", event => {
+    if (event.target === event.currentTarget) closeModal("shareable-popup");
+});
+
+
+/* ==========================================================================
+   Physical keyboard
+   ========================================================================== */
+
+document.addEventListener("keydown", event => {
+    if (event.metaKey || event.ctrlKey || event.altKey) return;
+
+    const howToOpen = !$("how-to-play-popup").classList.contains("hidden");
+    const shareOpen = !$("shareable-popup").classList.contains("hidden");
+
+    if (isIntroVisible()) {
+        if (event.key === "Enter") {
+            event.preventDefault();
+            $("play-btn").click();
+        }
+        return;
+    }
+
+    if (howToOpen) {
+        if (event.key === "Enter" || event.key === "Escape") {
+            event.preventDefault();
+            closeHowToPlay();
+        }
+        return;
+    }
+
+    if (shareOpen) {
+        if (event.key === "Escape") closeModal("shareable-popup");
+        return;
+    }
+
+    if (gameOver) return;
+
+    const key = event.key;
+
+    // A focused button handles its own Enter / Space activation
+    if ((key === "Enter" || key === " ") && event.target.closest("button")) return;
+
+    if (key === "Enter") {
+        event.preventDefault();
+        submitGuess();
+    } else if (key === "Backspace") {
+        event.preventDefault();
+        flashButton($("delete-btn"));
+        deleteLetter();
+    } else if (key === "ArrowLeft") {
+        moveCursorTo(cursor - 1);
+    } else if (key === "ArrowRight") {
+        moveCursorTo(cursor + 1);
+    } else if (/^[a-zA-Z]$/.test(key)) {
+        typeLetter(key.toUpperCase());
+    } else if (key === " ") {
+        event.preventDefault();
+        typeLetter(" ");
+    } else if (DTMF[key]) {
+        // Number keys, * and # work just like the on-screen keypad
+        flashKey(key);
+        handleKeypadAction(key);
+    }
+});
+
+function flashButton(button) {
+    button.classList.add("pressed");
+    setTimeout(() => button.classList.remove("pressed"), 120);
 }
+
+
+/* ==========================================================================
+   Init
+   ========================================================================== */
+
+document.documentElement.style.setProperty("--multitap-ms", `${MULTI_TAP_MS}ms`);
+createInputGrid();
+setupKeypad();
+renderSoundToggle();
