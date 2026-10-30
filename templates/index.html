@@ -1,7 +1,4 @@
 <!DOCTYPE html>
-
-
-
 <html lang="en">
 <head>
     <!-- Google tag (gtag.js) -->
@@ -15,134 +12,200 @@
     </script>
 
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#ffffff">
     <title>Dial In</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Lexend:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+
     <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
     <script src="{{ url_for('static', filename='script.js') }}" defer></script>
-    <!-- ✅ Load Lexend font -->
-    <!--<link href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;600&display=swap" rel="stylesheet"> -->
+
+    <link rel="icon" href="{{ url_for('static', filename='logoMini.png') }}" type="image/png">
+    <!-- Apple Touch Icon (for iOS devices)         Android Icon -->
+    <link rel="apple-touch-icon" href="{{ url_for('static', filename='logoMini.png') }}">
+    <link rel="icon" sizes="192x192" href="{{ url_for('static', filename='logoMini.png') }}">
 </head>
-<body>
+<body data-game-number="{{ game_number }}" data-current-date="{{ current_date }}">
+
+    <!-- Intro screen -->
     <div id="game-intro">
         <div class="intro-content">
-            <img src="static/logo.png" alt="Game Logo" class="game-logo">
-            <p>Use the number code to guess the <br>10-letter word or phrase.<br><br>You have 3 chances.</p>
+            <img src="{{ url_for('static', filename='logo.png') }}" alt="Dial In" class="game-logo">
+            <p class="intro-tagline">Crack the phone number.<br>Find the 10-letter word or phrase.</p>
+            <p class="intro-sub">You have 3 chances.</p>
             <button id="play-btn">Play</button>
-            <p class="puzzle-info">{{current_date}}<br>No.{{game_number}}</p>
+            <p class="puzzle-info">{{ current_date }}<br>No. {{ game_number }}</p>
         </div>
     </div>
 
-    <!-- ✅ Toolbar at the top -->
-    <div id="toolbar">
-        <img src="static/logo.png" alt="Game Logo" class="toolbar-logo">
-        <p id="game-info">Dial In #{{ game_number }} – {{ current_date }}</p>
-        <div id="help-icon">?</div>
-    </div>
+    <!-- Toolbar -->
+    <header id="toolbar">
+        <a href="/" class="toolbar-home" aria-label="Dial In home">
+            <img src="{{ url_for('static', filename='logoMini.png') }}" alt="Dial In" class="toolbar-logo">
+        </a>
+        <p id="game-info">No. {{ game_number }} · {{ current_date }}</p>
+        <div class="toolbar-actions">
+            <button id="sound-toggle" class="icon-btn" aria-label="Toggle keypad sound">
+                <svg class="icon-sound-on" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg>
+                <svg class="icon-sound-off" viewBox="0 0 24 24" aria-hidden="true"><path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z"/></svg>
+            </button>
+            <button id="help-icon" class="icon-btn icon-btn-solid" aria-label="How to play">?</button>
+        </div>
+    </header>
 
-    <!-- ✅ "How to Play" Popup -->
-    <div id="how-to-play-popup" class="popup-hidden">
-        <div class="popup-content">
-            <button id="close-how-to-play">✖</button>
-            <h2>How To Play</h2>
-            <p>Guess the 10-letter word or phrase in 3 tries.</p>
-            <ul>
-                <li>Each guess must be a valid 10-letter word or phrase.</li>
-                <li>Decipher the hidden code by matching the letters to the numbers from the keypad.</li>
-                <li>The color of the boxes will show if you've placed a letter in the correct spot.</li>
+    <!-- "How to Play" popup -->
+    <div id="how-to-play-popup" class="modal-overlay hidden">
+        <div class="modal" role="dialog" aria-modal="true" aria-labelledby="how-to-play-title">
+            <button id="close-how-to-play" class="modal-close" aria-label="Close">✕</button>
+            <h2 id="how-to-play-title">How to Play</h2>
+            <p class="modal-lead">Decode the secret phone number into a 10-letter word or phrase. You have 3 tries.</p>
+
+            <ul class="rules">
+                <li>Each digit matches the letters on a classic <strong>phone keypad</strong>.</li>
+                <li><strong>Tap a key repeatedly</strong> to cycle its letters, just like texting on an old phone.</li>
+                <li><strong>0</strong> is a space between words.</li>
+                <li>Correct letters turn <span class="text-correct">green</span>.</li>
+                <li>Solve it in the <strong>fewest guesses</strong> and <strong>fastest time</strong>, then share your score.</li>
             </ul>
 
-        <!-- ✅ Number Mapping Visual -->
-        <div class="number-mapping">
-            <!-- Left side: Image -->
-            <img src="static/four.png" alt="Mapping Guide" class="mapping-image">
-
-            <!-- Middle: Three stacked number cells -->
-            <div class="number-column">
+            <!-- Number mapping visual -->
+            <div class="number-mapping" aria-hidden="true">
+                <div class="key key-demo">
+                    <span class="key-num">4</span>
+                    <span class="key-letters">GHI</span>
+                </div>
+                <span class="mapping-arrow">→</span>
+                <div class="number-column">
                     <div class="example-cell">G</div>
                     <div class="example-cell">H</div>
                     <div class="example-cell">I</div>
-            </div>
-
-                <!-- Right Side: Single Number with Arrows -->
-            <div class="final-number">
-                <div class="example-cell correct">H</div>
-            </div>
-
-
-            </div>
-                    <!-- ✅ Example section -->
-                    <h3>Example</h3>
-                    
-                    <div class="example-row">
-                        <div class="example-cell correct">J</div>
-                        <div class="example-cell correct">A</div>
-                        <div class="example-cell correct">Z</div>
-                        <div class="example-cell correct">Z</div>
-                        <div class="example-cell correct"> </div>
-                        <div class="example-cell correct">M</div>
-                        <div class="example-cell incorrect">O</div>
-                        <div class="example-cell correct">S</div>
-                        <div class="example-cell correct">I</div>
-                        <div class="example-cell correct">C</div>
-                    </div>
-                    <p>The gray box <strong>O</strong> is not the correct letter.</p>
-                    <p>The green boxes are all correct!</p>
-                    <!-- ✅ Horizontal Divider & New Puzzle Info -->
-                    <hr class="popup-divider">
-                    <p class="new-puzzle-info">A new puzzle is released at midnight every day.</p>
-
                 </div>
-            <!-- ✅ Play Button -->
-            <div class="play-button-wrapper">
-                <button id="play-button" class="play-button">PLAY</button>
+                <span class="mapping-arrow">→</span>
+                <div class="final-number">
+                    <div class="example-cell correct">H</div>
+                </div>
             </div>
+            <p class="mapping-caption">Tap <strong>4</strong> twice for <strong>H</strong>. Use <strong>#</strong> to lock a letter and move on.</p>
+
+            <!-- Example section -->
+            <h3>Example</h3>
+            <div class="example-row example-code">
+                <div class="example-cell">5</div>
+                <div class="example-cell">2</div>
+                <div class="example-cell">9</div>
+                <div class="example-cell">9</div>
+                <div class="example-cell code-space">0</div>
+                <div class="example-cell">6</div>
+                <div class="example-cell">8</div>
+                <div class="example-cell">7</div>
+                <div class="example-cell">4</div>
+                <div class="example-cell">2</div>
+            </div>
+            <div class="example-row">
+                <div class="example-cell correct">J</div>
+                <div class="example-cell correct">A</div>
+                <div class="example-cell correct">Z</div>
+                <div class="example-cell correct">Z</div>
+                <div class="example-cell correct is-space"></div>
+                <div class="example-cell correct">M</div>
+                <div class="example-cell incorrect">T</div>
+                <div class="example-cell correct">S</div>
+                <div class="example-cell correct">I</div>
+                <div class="example-cell correct">C</div>
+            </div>
+            <p class="example-note">The gray <strong>T</strong> is wrong (8 should be <strong>U</strong>). Everything green is right.</p>
+
+            <hr class="popup-divider">
+            <p class="new-puzzle-info">A new puzzle is released at midnight every day.</p>
+
+            <div class="play-button-wrapper">
+                <button id="play-button" class="play-button">Play</button>
+            </div>
+        </div>
     </div>
 
-    
-    <div class="container" id="game-container">
-        <div id="game-timer" class="game-timer">0:00</div>
-
-        <input type="text" id="hidden-mobile-input" maxlength="1">
-
-
-        <div class="number-code" data-word="{{ word }}"></div>
-        <div id="number-grid" class="grid"></div>
-        <div id="guess-container"></div>
-
-        <div id="guess-input-grid" class="grid"></div>
-
-        <!--add image-->
-        <div id="keyboard-container">
-            <img src="{{ url_for('static', filename='lightmode-keypad.png') }}" alt="Phone Keypad" class="keyboard-image">
+    <!-- Game -->
+    <main class="container" id="game-container">
+        <div class="status-bar">
+            <div class="attempts" aria-label="Guesses remaining">
+                <span id="dot1" class="attempt-dot"></span>
+                <span id="dot2" class="attempt-dot"></span>
+                <span id="dot3" class="attempt-dot"></span>
+            </div>
+            <div id="game-timer" class="game-timer">0:00</div>
         </div>
-        
-        <button id="submit-btn" class="circle-button disabled" disabled>
-            <img src="static/phoneicon.png" alt="Call" class="circle-icon">
-        </button>
-        <!-- Share button to reopen popup -->
-        <button id="share-btn" class="hidden-share share-btn" onclick="showShareablePopup()">Share</button>
-        
-        
-        <div id="shareable-popup" class="hidden">
-            <button id="close-popup">✖</button> <!-- ✅ Moved to top right -->
-            <!-- ✅ Game Logo at the Top -->
-            <img src="static/logo.png" alt="Game Logo" class="popup-logo">
 
+        <div class="board" id="board">
+            <div class="board-inner">
+                <div id="number-grid" class="grid">
+                    {% for digit in number_code %}
+                        <div class="grid-cell code-cell{% if digit == '0' %} code-space{% endif %}">{{ digit }}</div>
+                    {% endfor %}
+                </div>
+
+                <div id="guess-container"></div>
+
+                <div id="guess-input-grid" class="grid"></div>
+            </div>
+        </div>
+
+        <!-- Phone keypad -->
+        <div id="keyboard-container" class="keypad">
+            <button class="key key-dead" data-key="1"><span class="key-num">1</span><span class="key-letters">&nbsp;</span></button>
+            <button class="key" data-key="2"><span class="key-num">2</span><span class="key-letters">ABC</span></button>
+            <button class="key" data-key="3"><span class="key-num">3</span><span class="key-letters">DEF</span></button>
+            <button class="key" data-key="4"><span class="key-num">4</span><span class="key-letters">GHI</span></button>
+            <button class="key" data-key="5"><span class="key-num">5</span><span class="key-letters">JKL</span></button>
+            <button class="key" data-key="6"><span class="key-num">6</span><span class="key-letters">MNO</span></button>
+            <button class="key" data-key="7"><span class="key-num">7</span><span class="key-letters">PQRS</span></button>
+            <button class="key" data-key="8"><span class="key-num">8</span><span class="key-letters">TUV</span></button>
+            <button class="key" data-key="9"><span class="key-num">9</span><span class="key-letters">WXYZ</span></button>
+            <button class="key" data-key="*" aria-label="Clear guess"><span class="key-num key-symbol">*</span><span class="key-letters key-word">clear</span></button>
+            <button class="key" data-key="0" aria-label="0, space"><span class="key-num">0</span><span class="key-letters key-word">space</span></button>
+            <button class="key" data-key="#" aria-label="Next letter"><span class="key-num key-symbol">#</span><span class="key-letters key-word">next</span></button>
+
+            <span class="key-spacer"></span>
+            <button id="submit-btn" class="circle-button disabled" disabled aria-label="Submit guess">
+                <svg viewBox="0 0 24 24" class="circle-icon" aria-hidden="true"><path d="M6.62 10.79c1.44 2.83 3.76 5.14 6.59 6.59l2.2-2.2c.27-.27.67-.36 1.02-.24 1.12.37 2.33.57 3.57.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1-9.39 0-17-7.61-17-17 0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.25.2 2.45.57 3.57.11.35.03.74-.25 1.02l-2.2 2.2z"/></svg>
+            </button>
+            <button id="delete-btn" class="delete-button" aria-label="Delete letter">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M22 3H7c-.69 0-1.23.35-1.59.88L0 12l5.41 8.11c.36.53.9.89 1.59.89h15c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H7.07L2.4 12l4.66-7H22v14zm-11.59-2L14 13.41 17.59 17 19 15.59 15.41 12 19 8.41 17.59 7 14 10.59 10.41 7 9 8.41 12.59 12 9 15.59z"/></svg>
+            </button>
+        </div>
+
+        <!-- Reopen results after the game ends -->
+        <button id="share-btn" class="hidden-share share-btn">See results</button>
+    </main>
+
+    <!-- Results popup -->
+    <div id="shareable-popup" class="modal-overlay hidden">
+        <div class="modal" role="dialog" aria-modal="true" aria-labelledby="popup-message">
+            <button id="close-popup" class="modal-close" aria-label="Close">✕</button>
+            <img src="{{ url_for('static', filename='logo.png') }}" alt="Dial In" class="popup-logo">
 
             <div class="popup-content">
-                <h2 id="popup-message">Game Over!</h2> <!-- ✅ Dynamic message -->
+                <h2 id="popup-message">Game Over!</h2>
 
+                <p class="answer-label">The number was</p>
                 <p id="code-word"></p>
                 <p id="final-time" class="final-time-text"></p>
                 <p id="shareable-text"></p>
-                <button id="copy-btn">Copy</button>
-                <!-- ✅ Countdown Message -->
+
+                <div id="results-button-container">
+                    <button id="SHARE-RESULTS-BUTTON">Share</button>
+                    <button id="COPY-RESULTS-BUTTON">Copy</button>
+                </div>
+
+                <div id="copy-message">Copied to clipboard</div>
+
                 <p id="play-again-message" class="countdown-message">
-                    Want to play again?<br>
-                    Come back tomorrow for a new word in 
-                    <span id="countdown-hours" class="countdown-timer"></span> 
-                    <span class="countdown-message">and</span> 
-                    <span id="countdown-minutes" class="countdown-timer"></span>!
+                    Next number in
+                    <span id="countdown-hours" class="countdown-timer"></span>
+                    and
+                    <span id="countdown-minutes" class="countdown-timer"></span>
                 </p>
             </div>
         </div>
